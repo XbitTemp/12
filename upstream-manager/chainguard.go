@@ -42,6 +42,8 @@ import (
 	"sync"
 	"time"
 
+	"unsafe"
+
 	"golang.org/x/sys/windows"
 
 	"github.com/amnezia-vpn/amneziawg-windows/v3/conf"
@@ -212,6 +214,10 @@ func chainLocalNetworks(adapter string) []string {
 
 // chainArmGuard starts awgchain-guard.exe for the chain ending at leaf.
 func (s *ManagerService) chainArmGuard(leaf string) {
+	if chainGuardGaveUp() {
+		log.Printf("[AwgChain] The kill switch died at once three times in a row, so it is left alone until the chain is stopped. The chain itself keeps running.")
+		return
+	}
 	if chainAutoGuardDisabled() {
 		log.Printf("[AwgChain] The kill switch is switched off by no-autoguard, leaving it alone")
 		return
@@ -290,6 +296,9 @@ func (s *ManagerService) chainArmGuard(leaf string) {
 
 	log.Printf("[AwgChain] Kill switch armed for %s -> %s, lan %v, pid %d", root, top, lans, cmd.Process.Pid)
 
+
+	chainGuardNoteArm()
+
 	go func(started *exec.Cmd) {
 		started.Wait()
 		chainGuardLock.Lock()
@@ -298,7 +307,15 @@ func (s *ManagerService) chainArmGuard(leaf string) {
 			chainGuardArmedBy = ""
 		}
 		chainGuardLock.Unlock()
-		log.Printf("[AwgChain] The kill switch process has ended")
+		deaths, quick := chainGuardNoteDeath()
+		if !quick {
+			log.Printf("[AwgChain] The kill switch process has ended")
+			return
+		}
+		log.Printf("[AwgChain] The kill switch died right after it was armed, %d times in a row", deaths)
+		if deaths >= chainGuardMaxDeaths {
+			log.Printf("[AwgChain] Giving up on the kill switch for now. Look at guard-auto-log.txt, and check that awgchain-guard.exe understands the arguments the manager sends it.")
+		}
 	}(cmd)
 }
 
@@ -309,7 +326,11 @@ func chainSignalGuardStop() error {
 	}
 	// Manual reset event. Creating it by name opens the existing one when the
 	// guard is already running, which is exactly what we want here.
-	handle, err := windows.CreateEvent(nil, 1, 0, name)
+	handle, err := windows.CreateEvent(chainStopEventSecurity(), 1, 0, name)
+	if handle != 0 && err == windows.ERROR_ALREADY_EXISTS {
+		// The event already exists and we got a working handle: that is fine.
+		err = nil
+	}
 	if err != nil && handle == 0 {
 		return err
 	}
@@ -580,6 +601,70 @@ func (s *ManagerService) chainBeforeStop(tunnelName string) {
 		return
 	}
 	log.Printf("[AwgChain] %s was asked to stop, so the watch and the kill switch stand down", tunnelName)
+
 	chainStopWatch()
+	chainGuardResetDeaths()
 	chainDisarmGuard()
+}
+
+// --------------------------------------------------------------------------
+// Pack 44
+//
+// 1. The stop event is created with a security descriptor that lets an
+//    ordinary elevated console signal it, so "awgchain.bat ks off" no longer
+//    ends in "Access is denied" and a taskkill.
+// 2. A guard that dies immediately after it was armed is counted. Three such
+//    deaths in a row and the manager stops re-arming it: a kill switch that
+//    cannot live is worse than no kill switch, because the endless
+//    arm-and-die cycle tore the chain apart every five seconds. That was the
+//    regression of patch 22, and it must never be able to repeat silently.
+// --------------------------------------------------------------------------
+
+const chainGuardMaxDeaths = 3
+const chainGuardQuickDeath = 30 * time.Second
+
+var (
+	chainGuardDeaths  int
+	chainGuardLastArm time.Time
+)
+
+func chainStopEventSecurity() *windows.SecurityAttributes {
+	sd, err := windows.SecurityDescriptorFromString("D:(A;;0x001F0003;;;SY)(A;;0x001F0003;;;BA)(A;;0x00100002;;;WD)")
+	if err != nil {
+		return nil
+	}
+	sa := &windows.SecurityAttributes{SecurityDescriptor: sd}
+	sa.Length = uint32(unsafe.Sizeof(*sa))
+	return sa
+}
+
+func chainGuardGaveUp() bool {
+	chainGuardLock.Lock()
+	defer chainGuardLock.Unlock()
+	return chainGuardDeaths >= chainGuardMaxDeaths
+}
+
+func chainGuardNoteArm() {
+	chainGuardLock.Lock()
+	chainGuardLastArm = time.Now()
+	chainGuardLock.Unlock()
+}
+
+// chainGuardNoteDeath tells a crash from a normal stop: a guard that lived
+// for a while was stopped on purpose, one that died at once is broken.
+func chainGuardNoteDeath() (int, bool) {
+	chainGuardLock.Lock()
+	defer chainGuardLock.Unlock()
+	if time.Since(chainGuardLastArm) < chainGuardQuickDeath {
+		chainGuardDeaths++
+		return chainGuardDeaths, true
+	}
+	chainGuardDeaths = 0
+	return 0, false
+}
+
+func chainGuardResetDeaths() {
+	chainGuardLock.Lock()
+	chainGuardDeaths = 0
+	chainGuardLock.Unlock()
 }

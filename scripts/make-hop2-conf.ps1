@@ -125,7 +125,48 @@ $text = ($lines -join "`r`n") + "`r`n"
 $dir = Split-Path -Parent $Out
 if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 $enc = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($Out, $text, $enc)
+function Write-Conf {
+  param(
+    [Parameter(Mandatory=$true)][string]$Path,
+    [Parameter(Mandatory=$true)][string]$Text,
+    [Parameter(Mandatory=$true)]$Encoding
+  )
+
+  # The manager stores every config with its own hard ACL: owner LocalSystem,
+  # inheritance disabled, Administrators get Delete only. Writing over such a
+  # file fails with "Access to the path ... is denied" even from an elevated
+  # console, while deleting it works. So: clear, delete, then write fresh.
+  if (Test-Path -LiteralPath $Path) {
+    $needsClear = $false
+    try {
+      $fs = [System.IO.File]::Open($Path, 'Open', 'Write', 'None')
+      $fs.Close()
+    } catch {
+      $needsClear = $true
+    }
+
+    if ($needsClear) {
+      try {
+        $item = Get-Item -LiteralPath $Path -Force
+        $item.Attributes = 'Normal'
+      } catch {
+        Write-Host 'could not clear the attributes, continuing anyway'
+      }
+      try {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+      } catch {
+        & takeown.exe /f $Path /a | Out-Null
+        & icacls.exe $Path /grant '*S-1-5-32-544:(F)' | Out-Null
+        Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+      }
+      Write-Host "cleared the protected old config: $Path"
+    }
+  }
+
+  [System.IO.File]::WriteAllText($Path, $Text, $Encoding)
+}
+
+Write-Conf -Path $Out -Text $text -Encoding $enc
 
 Write-Host "wrote $Out"
 Write-Host "  address        : $($addr4 -join ', ')"

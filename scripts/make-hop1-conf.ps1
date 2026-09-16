@@ -153,7 +153,47 @@ $text = ($lines -join "`r`n") + "`r`n"
 $dir = Split-Path -Parent $Out
 if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 $enc = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($Out, $text, $enc)
+function Write-Conf {
+  param([string]$Path, [string]$Text, $Encoding)
+
+  if (Test-Path -LiteralPath $Path) {
+    $fixed = @()
+    try {
+      $fi = Get-Item -LiteralPath $Path -Force
+      if ($fi.Attributes -ne 'Normal') {
+        try { $fi.Attributes = 'Normal'; $fixed += 'attributes' } catch { }
+      }
+    } catch { }
+
+    $writable = $false
+    try {
+      $fs = [System.IO.File]::Open($Path, 'Open', 'Write', 'None')
+      $fs.Close()
+      $writable = $true
+    } catch { }
+
+    if (-not $writable) {
+      & "$env:SystemRoot\System32\takeown.exe" /f $Path /a | Out-Null
+      & "$env:SystemRoot\System32\icacls.exe" $Path /grant '*S-1-5-32-544:(F)' | Out-Null
+      $fixed += 'owner and access list'
+    }
+
+    try {
+      Remove-Item -LiteralPath $Path -Force
+      $fixed += 'removed the old file'
+    } catch {
+      Write-Host ('[WARN] could not remove the old config: ' + $_.Exception.Message)
+    }
+
+    if ($fixed.Count -gt 0) {
+      Write-Host ('cleared the protected old config: ' + ($fixed -join ', '))
+    }
+  }
+
+  [System.IO.File]::WriteAllText($Path, $Text, $Encoding)
+}
+
+Write-Conf -Path $Out -Text $text -Encoding $enc
 
 # ---------- report ----------
 Write-Host "wrote $Out"

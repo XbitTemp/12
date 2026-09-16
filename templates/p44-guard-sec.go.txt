@@ -1,0 +1,20 @@
+
+// --------------------------------------------------------------------------
+// Pack 44: "awgchain-guard.exe -stop" used to fail with "Access is denied".
+//
+// The guard is started by the manager service, so the stop event is created
+// by LocalSystem, and the default security of that object lets nobody else
+// signal it. The event is now created with an explicit descriptor: SYSTEM and
+// the administrators get full access, everyone else gets just the right to
+// set it, which is all that -stop needs.
+// --------------------------------------------------------------------------
+
+func stopEventSecurity() *windows.SecurityAttributes {
+	sd, err := windows.SecurityDescriptorFromString("D:(A;;0x001F0003;;;SY)(A;;0x001F0003;;;BA)(A;;0x00100002;;;WD)")
+	if err != nil {
+		return nil
+	}
+	sa := &windows.SecurityAttributes{SecurityDescriptor: sd}
+	sa.Length = uint32(unsafe.Sizeof(*sa))
+	return sa
+}

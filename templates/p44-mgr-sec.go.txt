@@ -1,0 +1,62 @@
+
+// --------------------------------------------------------------------------
+// Pack 44
+//
+// 1. The stop event is created with a security descriptor that lets an
+//    ordinary elevated console signal it, so "awgchain.bat ks off" no longer
+//    ends in "Access is denied" and a taskkill.
+// 2. A guard that dies immediately after it was armed is counted. Three such
+//    deaths in a row and the manager stops re-arming it: a kill switch that
+//    cannot live is worse than no kill switch, because the endless
+//    arm-and-die cycle tore the chain apart every five seconds. That was the
+//    regression of patch 22, and it must never be able to repeat silently.
+// --------------------------------------------------------------------------
+
+const chainGuardMaxDeaths = 3
+const chainGuardQuickDeath = 30 * time.Second
+
+var (
+	chainGuardDeaths  int
+	chainGuardLastArm time.Time
+)
+
+func chainStopEventSecurity() *windows.SecurityAttributes {
+	sd, err := windows.SecurityDescriptorFromString("D:(A;;0x001F0003;;;SY)(A;;0x001F0003;;;BA)(A;;0x00100002;;;WD)")
+	if err != nil {
+		return nil
+	}
+	sa := &windows.SecurityAttributes{SecurityDescriptor: sd}
+	sa.Length = uint32(unsafe.Sizeof(*sa))
+	return sa
+}
+
+func chainGuardGaveUp() bool {
+	chainGuardLock.Lock()
+	defer chainGuardLock.Unlock()
+	return chainGuardDeaths >= chainGuardMaxDeaths
+}
+
+func chainGuardNoteArm() {
+	chainGuardLock.Lock()
+	chainGuardLastArm = time.Now()
+	chainGuardLock.Unlock()
+}
+
+// chainGuardNoteDeath tells a crash from a normal stop: a guard that lived
+// for a while was stopped on purpose, one that died at once is broken.
+func chainGuardNoteDeath() (int, bool) {
+	chainGuardLock.Lock()
+	defer chainGuardLock.Unlock()
+	if time.Since(chainGuardLastArm) < chainGuardQuickDeath {
+		chainGuardDeaths++
+		return chainGuardDeaths, true
+	}
+	chainGuardDeaths = 0
+	return 0, false
+}
+
+func chainGuardResetDeaths() {
+	chainGuardLock.Lock()
+	chainGuardDeaths = 0
+	chainGuardLock.Unlock()
+}

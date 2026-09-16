@@ -46,6 +46,8 @@ import (
 	"strings"
 	"time"
 
+	"unsafe"
+
 	"golang.org/x/sys/windows"
 
 	"github.com/amnezia-vpn/amneziawg-windows/v3/tunnel/firewall"
@@ -214,7 +216,14 @@ func createStopEvent() (windows.Handle, error) {
 	}
 	// Manual reset, initially not signalled. Opens the existing event when a
 	// guard is already running.
-	return windows.CreateEvent(nil, 1, 0, name)
+	h, err := windows.CreateEvent(stopEventSecurity(), 1, 0, name)
+	if h != 0 && err == windows.ERROR_ALREADY_EXISTS {
+		// Somebody created the event first, which is the normal case: -stop only
+		// needs to open the event and set it, not to own it. CreateEvent still
+		// hands back a usable handle here, so this is success, not a failure.
+		return h, nil
+	}
+	return h, err
 }
 
 func signalStop() error {
@@ -461,4 +470,24 @@ func holdKillSwitch(stopEvent windows.Handle, cfg *firewall.ChainFirewallConfig,
 		lastBeat = time.Now()
 		say("KILLSWITCH=RELOAD hop1=%d hop2=%d reloads=%d", hop1LUID, hop2LUID, reloads)
 	}
+}
+
+// --------------------------------------------------------------------------
+// Pack 44: "awgchain-guard.exe -stop" used to fail with "Access is denied".
+//
+// The guard is started by the manager service, so the stop event is created
+// by LocalSystem, and the default security of that object lets nobody else
+// signal it. The event is now created with an explicit descriptor: SYSTEM and
+// the administrators get full access, everyone else gets just the right to
+// set it, which is all that -stop needs.
+// --------------------------------------------------------------------------
+
+func stopEventSecurity() *windows.SecurityAttributes {
+	sd, err := windows.SecurityDescriptorFromString("D:(A;;0x001F0003;;;SY)(A;;0x001F0003;;;BA)(A;;0x00100002;;;WD)")
+	if err != nil {
+		return nil
+	}
+	sa := &windows.SecurityAttributes{SecurityDescriptor: sd}
+	sa.Length = uint32(unsafe.Sizeof(*sa))
+	return sa
 }

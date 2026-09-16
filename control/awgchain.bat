@@ -266,6 +266,7 @@ echo ==========================================================
 echo hop 1 (WARP)    : %SRC1%
 echo hop 2 (Amnezia) : %SRC2%
 echo MTU             : hop1 %M1% / hop2 %M2%
+echo pair            : %N2%   hidden hop: %N1%
 echo.
 
 echo ==== %DATE% %TIME% chain-up ====> "%LOG%"
@@ -678,7 +679,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 if errorlevel 1 goto copyfail
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 echo RESULT=OK>> "%LOG%"
@@ -767,7 +768,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 :p6_noguard
 echo RESULT=OK>> "%LOG%"
@@ -809,7 +810,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 :p7_noguard
 echo RESULT=OK>> "%LOG%"
@@ -1053,7 +1054,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 :p11_noguard
 echo RESULT=OK>> "%LOG%"
@@ -1112,7 +1113,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 :p10_noguard
 echo RESULT=OK>> "%LOG%"
@@ -1198,7 +1199,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 :p9_noguard
 echo RESULT=OK>> "%LOG%"
@@ -1241,7 +1242,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 :p8_noguard
 echo RESULT=OK>> "%LOG%"
@@ -1345,7 +1346,7 @@ echo --- go build guard --->> "%LOG%"
 go build -ldflags "-s -w" -trimpath -buildvcs=false -o amd64\awgchain-guard.exe .\chainguard >> "%LOG%" 2>&1
 if errorlevel 1 goto buildfail
 if not exist "%BIN%" mkdir "%BIN%"
-copy /y "%CLIENT%\amd64\awgchain-guard.exe" "%GUARDEXE%" >> "%LOG%" 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%copy-guard.ps1" -Src "%CLIENT%\amd64\awgchain-guard.exe" -Dst "%GUARDEXE%" >> "%LOG%" 2>&1
 for %%F in ("%GUARDEXE%") do echo guard size: %%~zF >> "%LOG%"
 :p4_noguard
 echo RESULT=OK>> "%LOG%"
@@ -1721,7 +1722,7 @@ set "PAIRSRC=the AWGCHAIN_PAIR variable"
 set "PAIR=%PAIR: =%"
 if not "%PAIR%"=="" goto dpapply
 set "PAIRSRC=fallback to the old console names"
-set "PAIR=hop2-amnezia"
+set "PAIR=warpam"
 :dpapply
 set "N2=%PAIR%"
 set "N1=%PAIR%-hop1"
