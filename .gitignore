@@ -1,0 +1,10 @@
+# never publish keys, live configs or local rubbish
+*.conf
+*.dpapi
+*.exe
+*.dll
+*.zip
+*.orig-*
+logs/
+*.log
+.git-remote.txt
