@@ -103,6 +103,10 @@ func (iw *interfaceWatcher) setup(family winipcfg.AddressFamily) {
 	log.Printf("Monitoring default %s routes", ipversion)
 	*changeCallbacks, err = monitorDefaultRoutes(family, iw.binder, iw.conf.Interface.MTU == 0, hasDefaultRoute(family, iw.conf.Peers), iw.tun, iw.conf.Interface.PinEndpointVia)
 	if err != nil {
+		if chainIsPinNotReady(err) {
+			iw.chainRetrySetup(family, err)
+			return
+		}
 		iw.errors <- interfaceWatcherError{services.ErrorBindSocketsToDefaultRoutes, err}
 		return
 	}

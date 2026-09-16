@@ -1,0 +1,118 @@
+//go:build windows
+
+/* AwgChain - pack 45: a missing hop underneath is no longer a fatal error.
+ *
+ * Until now the tunnel service treated PinEndpointVia pointing at an adapter
+ * that does not exist yet as a reason to die:
+ *
+ *   Unable to bind sockets to default route: pinned interface "warpam-hop1" not found
+ *   Device closing
+ *
+ * That is exactly what happens when the service of hop 2 is started on its
+ * own (service autostart at boot, the button in the window, sc start), while
+ * hop 1 is still coming up. The service died seven milliseconds after
+ * startup, and only the repair loop of the manager put the chain back
+ * together five to twenty seconds later.
+ *
+ * From now on the tunnel stays alive and waits: the missing or still
+ * unfinished hop underneath is reported as a temporary condition, the socket
+ * is bound and the host route is pinned as soon as the hop appears.
+ */
+
+package tunnel
+
+import (
+	"errors"
+	"log"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/amnezia-vpn/amneziawg-windows/v3/conf"
+	"github.com/amnezia-vpn/amneziawg-windows/v3/tunnel/winipcfg"
+)
+
+const (
+	chainPinRetryGap   = 2 * time.Second
+	chainPinRetryTries = 30
+)
+
+// chainPinNotReadyError marks the conditions that only mean "not yet".
+type chainPinNotReadyError struct{ err error }
+
+func (e *chainPinNotReadyError) Error() string { return e.err.Error() }
+
+func (e *chainPinNotReadyError) Unwrap() error { return e.err }
+
+func chainPinNotReady(err error) error { return &chainPinNotReadyError{err} }
+
+func chainIsPinNotReady(err error) bool {
+	var target *chainPinNotReadyError
+	return errors.As(err, &target)
+}
+
+// chainPinnedInterfaceReady reports whether the adapter we ride on is there
+// and up.
+func chainPinnedInterfaceReady(name string) bool {
+	via := strings.TrimSpace(name)
+	if via == "" {
+		return false
+	}
+	iface, err := findInterfaceByName(via)
+	if err != nil {
+		return false
+	}
+	return iface.OperStatus == winipcfg.IfOperStatusUp
+}
+
+var chainPinRetrying sync.Map
+
+// chainRetrySetup keeps looking for the hop underneath instead of pushing a
+// fatal error into the watcher, which would stop the whole tunnel service.
+func (iw *interfaceWatcher) chainRetrySetup(family winipcfg.AddressFamily, cause error) {
+	if _, busy := chainPinRetrying.LoadOrStore(family, true); busy {
+		return
+	}
+	log.Printf("Chain: %v, so we wait for it instead of shutting the tunnel down", cause)
+	go func() {
+		defer chainPinRetrying.Delete(family)
+		for i := 0; i < chainPinRetryTries; i++ {
+			time.Sleep(chainPinRetryGap)
+			iw.setupMutex.Lock()
+			via := ""
+			if iw.conf != nil && iw.tun != nil {
+				via = iw.conf.Interface.PinEndpointVia
+			}
+			iw.setupMutex.Unlock()
+			if via == "" || !chainPinnedInterfaceReady(via) {
+				continue
+			}
+			log.Printf("Chain: the hop underneath (%s) is up, binding the socket now", strings.TrimSpace(via))
+			iw.setupMutex.Lock()
+			iw.setup(family)
+			iw.setupMutex.Unlock()
+			return
+		}
+		log.Printf("Chain: the hop underneath never came up, the tunnel stays but carries nothing")
+	}()
+}
+
+// chainPinRoutesLater pins the host route of the endpoint once the adapter of
+// the hop underneath shows up.
+func chainPinRoutesLater(config *conf.Config, cause error) {
+	if config == nil {
+		return
+	}
+	log.Printf("Chain pin route: %v, so the route is pinned once the hop underneath is here", cause)
+	go func() {
+		for i := 0; i < chainPinRetryTries; i++ {
+			time.Sleep(chainPinRetryGap)
+			if !chainPinnedInterfaceReady(config.Interface.PinEndpointVia) {
+				continue
+			}
+			chainPinRoutes(config, true)
+			return
+		}
+		log.Printf("Chain pin route: the hop underneath never came up, nothing was pinned")
+	}()
+}

@@ -108,7 +108,11 @@ func chainPinRoutes(config *conf.Config, add bool) {
 	}
 	iface, err := findInterfaceByName(via)
 	if err != nil {
-		log.Printf("Chain pin route: %v", err)
+		if add {
+			chainPinRoutesLater(config, err)
+		} else {
+			log.Printf("Chain pin route: %v", err)
+		}
 		return
 	}
 	luid := iface.LUID

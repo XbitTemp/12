@@ -45,7 +45,7 @@ func findInterfaceByName(name string) (*winipcfg.IPAdapterAddresses, error) {
 			return iface, nil
 		}
 	}
-	return nil, fmt.Errorf("pinned interface %q not found", name)
+	return nil, chainPinNotReady(fmt.Errorf("pinned interface %q not found", name))
 }
 
 // bindSocketPinned is the PinEndpointVia counterpart of bindSocketRoute.
@@ -55,7 +55,7 @@ func bindSocketPinned(family winipcfg.AddressFamily, binder conn.BindSocketToInt
 		return err
 	}
 	if iface.OperStatus != winipcfg.IfOperStatusUp {
-		return fmt.Errorf("pinned interface %q is not up (oper status %d)", pinVia, iface.OperStatus)
+		return chainPinNotReady(fmt.Errorf("pinned interface %q is not up (oper status %d)", pinVia, iface.OperStatus))
 	}
 
 	luid := iface.LUID
@@ -66,7 +66,7 @@ func bindSocketPinned(family winipcfg.AddressFamily, binder conn.BindSocketToInt
 		index = iface.IPv6IfIndex
 	}
 	if index == 0 {
-		return fmt.Errorf("pinned interface %q has no index for this address family", pinVia)
+		return chainPinNotReady(fmt.Errorf("pinned interface %q has no index for this address family", pinVia))
 	}
 
 	if luid == *lastLUID && index == *lastIndex {

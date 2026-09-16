@@ -75,8 +75,8 @@ function Wait-AdapterGone($name, $seconds) {
 function Get-Egress($tries) {
   for ($i = 1; $i -le $tries; $i++) {
     try {
-      $r = Invoke-RestMethod -Uri 'https://api.ipify.org?format=json' -TimeoutSec 8 -ErrorAction Stop
-      if (('' + $r.ip).Trim() -ne '') { return ('' + $r.ip).Trim() }
+      $out = & curl.exe -s --max-time 8 --no-keepalive --http1.1 https://api.ipify.org
+      $ip0 = ('' + $out).Trim(); if ($ip0 -match '^[0-9][0-9.]+$') { return $ip0 }
     } catch { }
     Start-Sleep -Milliseconds 700
   }
@@ -93,7 +93,7 @@ function Wait-Usable($seconds, $expect) {
       $ip = Get-Egress 1
       if ($ip -ne '') {
         $last = $ip
-        if (($expect -eq '') -or ($ip -eq $expect)) {
+        $good = $false; if ($expect -ne '') { $good = ($ip -eq $expect) } else { $good = ($ip -ne $leakAddr) }; if ($good) {
           $took = [int]((Get-Date) - $t0).TotalSeconds
           return @{ ok = $true; seconds = $took; egress = $ip }
         }
@@ -113,10 +113,18 @@ function Stop-All() {
 }
 
 function Dump-AppLog() {
-  try { & $Exe /dumplog /tail | Out-File -FilePath (Join-Path $Logs 'app-log.txt') -Encoding utf8 } catch { }
+  try { & $Exe /dumplog | Out-File -FilePath (Join-Path $Logs 'app-log.txt') -Encoding utf8 } catch { }
 }
 
 Note ('==== stress v5 start, ' + $Cycles + ' cycles, mode ' + $Mode + ', pair ' + $base + ' ====')
+
+# pack 46: a missing service is not worth a 60 second wait per cycle
+if (((Svc-State $s1) -eq "absent") -or ((Svc-State $s2) -eq "absent")) {
+  Note ("the chain services are not installed: " + $s1 + " / " + $s2)
+  Note ("raise the chain once with awgchain.bat up, then run the stress test again")
+  Write-Host "RESULT=FAIL reason=noservices"
+  exit 3
+}
 
 # The address seen with the chain down is the leak address.
 Stop-All
