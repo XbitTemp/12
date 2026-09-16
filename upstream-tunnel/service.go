@@ -220,6 +220,8 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 		return
 	}
 
+	chainWaitForPinBeforeUp(config)
+
 	log.Println("Bringing peers up")
 	dev.Up()
 
