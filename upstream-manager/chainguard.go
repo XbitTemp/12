@@ -441,7 +441,8 @@ func (s *ManagerService) chainRepair(leaf string) {
 	for attempt := 1; attempt <= chainStartRetries; attempt++ {
 		err := s.Start(leaf)
 		if err == nil {
-			log.Printf("[AwgChain] Repair: the chain is back up after %d seconds, the kill switch follows the new interfaces by itself", int(time.Since(started).Seconds()))
+			log.Printf("[AwgChain] Repair: the chain is back up after %d seconds, re-arming the kill switch on the new interfaces", int(time.Since(started).Seconds()))
+			s.chainRearmLockAfterRepair(leaf)
 			return
 		}
 		log.Printf("[AwgChain] Repair: try %d of %d did not take: %v", attempt, chainStartRetries, err)

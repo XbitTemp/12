@@ -267,6 +267,7 @@ echo hop 1 (WARP)    : %SRC1%
 echo hop 2 (Amnezia) : %SRC2%
 echo MTU             : hop1 %M1% / hop2 %M2%
 echo pair            : %N2%   hidden hop: %N1%
+echo kill switch     : none - this command bypasses the manager, raise the chain from the app window to be protected
 echo.
 
 echo ==== %DATE% %TIME% chain-up ====> "%LOG%"
