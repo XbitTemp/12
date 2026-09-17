@@ -55,7 +55,7 @@ rem  collect - build the publication tree out of C:\vpn and the two repos
 rem ==========================================================================
 :collect
 if not exist "%WORK%" mkdir "%WORK%"
-for %%D in (control patches scripts fork-sources templates docs upstream-manager upstream-tunnel upstream-conf) do if not exist "%WORK%\%%D" mkdir "%WORK%\%%D"
+for %%D in (control patches scripts fork-sources templates docs upstream-manager upstream-tunnel upstream-conf upstream-ui) do if not exist "%WORK%\%%D" mkdir "%WORK%\%%D"
 
 copy /y "%HERE%awgchain.bat" "%WORK%\control\" >nul 2>&1
 copy /y "%HERE%awgchain-watch.bat" "%WORK%\control\" >nul 2>&1
@@ -75,6 +75,7 @@ copy /y "%HERE%README*.txt" "%WORK%\docs\" >nul 2>&1
 rem the current state of the two repositories, source only
 copy /y "%CLIENT%\manager\*.go" "%WORK%\upstream-manager\" >nul 2>&1
 copy /y "%CLIENT%\chainguard\*.go" "%WORK%\upstream-manager\" >nul 2>&1
+copy /y "%CLIENT%\ui\*.go" "%WORK%\upstream-ui\\" 
 copy /y "%CORE%\tunnel\*.go" "%WORK%\upstream-tunnel\" >nul 2>&1
 copy /y "%CORE%\conf\*.go" "%WORK%\upstream-conf\" >nul 2>&1
 
