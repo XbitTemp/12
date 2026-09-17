@@ -230,6 +230,13 @@ func (s *ManagerService) chainArmGuard(leaf string) {
 		return
 	}
 
+	// Pack 51: the lock now lives in this process. Only when that is not
+	// possible do we fall back to starting awgchain-guard.exe.
+	if chainArmLockInProc(leaf) {
+		chainGuardNoteArm()
+		return
+	}
+
 	hops := chainHopOrder(leaf)
 	if len(hops) < 2 {
 		log.Printf("[AwgChain] %s is not part of a chain, so no kill switch", leaf)
@@ -339,6 +346,8 @@ func chainSignalGuardStop() error {
 }
 
 func chainDisarmGuard() {
+	// Pack 51: an in-process lock is lifted here and now, with no grace timer.
+	chainDisarmLockInProc()
 	chainGuardLock.Lock()
 	process := chainGuardProcess
 	chainGuardProcess = nil
