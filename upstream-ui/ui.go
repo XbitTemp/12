@@ -102,6 +102,7 @@ func RunUI() {
 	mtw.Dispose()
 
 	if shouldQuitManagerWhenExiting {
+		chainLiftLockBeforeQuit()
 		_, err := manager.IPCClientQuit(true)
 		if err != nil {
                         showErrorCustom(nil, l18n.Sprintf("Error Exiting AmneziaWG"), l18n.Sprintf("Unable to exit service due to: %v. You may want to stop AmneziaWG from the service manager.", err))

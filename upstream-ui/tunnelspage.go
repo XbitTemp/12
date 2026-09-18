@@ -165,6 +165,7 @@ func NewTunnelsPage() (*TunnelsPage, error) {
 	editTunnel.Clicked().Attach(tp.onEditTunnel)
 	editTunnel.SetVisible(IsAdmin)
 
+
 	disposables.Spare()
 
 	tp.listView.ItemCountChanged().Attach(tp.onTunnelsChanged)

@@ -61,6 +61,7 @@ type interfaceView struct {
 	maxHandshakeAttempts   *labelTextLine
 	randomTrailers         *labelTextLine
 	disableCookies         *labelTextLine
+	chainProtection        *labelTextLine
 	toggleActive           *toggleActiveLine
 	lines                  []widgetsLine
 }
@@ -316,6 +317,7 @@ func newInterfaceView(parent walk.Container) (*interfaceView, error) {
 		{l18n.Sprintf("MTU:"), &iv.mtu},
 		{l18n.Sprintf("Addresses:"), &iv.addresses},
 		{l18n.Sprintf("DNS servers:"), &iv.dns},
+		{chainProtectLabel, &iv.chainProtection},
 		{l18n.Sprintf("Scripts:"), &iv.scripts},
 		{l18n.Sprintf("Table:"), &iv.table},
 		{l18n.Sprintf("Header protection key:"), &iv.headerProtectionKey},
@@ -740,6 +742,7 @@ func (cv *ConfView) setTunnel(tunnel *manager.Tunnel, config *conf.Config, state
 
 	cv.interfaze.apply(&config.Interface)
 	cv.interfaze.status.update(state)
+	cv.chainApplyProtection(config.Name)
 	cv.interfaze.toggleActive.update(state)
 	inverse := make(map[*peerView]bool, len(cv.peers))
 	all := make([]*peerView, 0, len(cv.peers))

@@ -1,0 +1,183 @@
+//go:build windows
+
+/* AwgChain patch 54 - the chain panel inside the window.
+ *
+ * The chain, the hidden hop, the kill switch and the repair loop all live in
+ * the manager. The window showed none of it, so the user had to read the log
+ * or run awgchain.bat to know whether the machine was protected. The panel
+ * below asks the manager every two seconds and says it in one line, with one
+ * button that raises or drops the whole chain. Only an elevated window shows
+ * the panel, because only it may start and stop tunnels.
+ */
+
+package ui
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/lxn/walk"
+
+	"github.com/amnezia-vpn/amneziawg-windows-client/manager"
+)
+
+const (
+	chainPanelGap  = 2 * time.Second
+	chainPanelGive = 5
+)
+
+type chainPanel struct {
+	tp     *TunnelsPage
+	box    *walk.Composite
+	status *walk.Label
+	button *walk.PushButton
+	leaf   string
+	up     bool
+	busy   bool
+}
+
+// chainAttachPanel builds the panel and starts the poller. A failure here is
+// not fatal: without the panel the window simply looks like it did before.
+func (tp *TunnelsPage) chainAttachPanel() {
+	if !IsAdmin {
+		return
+	}
+	p := &chainPanel{tp: tp}
+
+	box, err := walk.NewComposite(tp.currentTunnelContainer)
+	if err != nil {
+		return
+	}
+	layout := walk.NewHBoxLayout()
+	layout.SetMargins(walk.Margins{15, 5, 15, 0})
+	box.SetLayout(layout)
+	p.box = box
+
+	if p.status, err = walk.NewLabel(box); err != nil {
+		return
+	}
+	p.status.SetText("Цепочка: смотрим...")
+
+	walk.NewHSpacer(box)
+
+	if p.button, err = walk.NewPushButton(box); err != nil {
+		return
+	}
+	p.button.SetMinMaxSize(walk.Size{190, 0}, walk.Size{190, 0})
+	p.button.SetText("Поднять цепочку")
+	p.button.SetEnabled(false)
+	p.button.Clicked().Attach(p.onClick)
+
+	go p.poll()
+}
+
+// poll asks the manager until the manager stops answering, which happens when
+// the window is on its way out.
+func (p *chainPanel) poll() {
+	misses := 0
+	for {
+		info, err := manager.IPCClientChainStatus()
+		if err != nil {
+			misses++
+			if misses >= chainPanelGive {
+				return
+			}
+		} else {
+			misses = 0
+		}
+		p.sync(func() { p.apply(info, err) })
+		time.Sleep(chainPanelGap)
+	}
+}
+
+// sync hands work to the window thread and survives a window that is already
+// gone.
+func (p *chainPanel) sync(f func()) {
+	defer func() { recover() }()
+	p.tp.Synchronize(f)
+}
+
+func (p *chainPanel) apply(info manager.ChainStatusInfo, err error) {
+	defer func() { recover() }()
+	if p.status == nil || p.button == nil {
+		return
+	}
+	if err != nil {
+		p.status.SetText("Цепочка: служба не отвечает")
+		p.button.SetEnabled(false)
+		return
+	}
+	if info.Leaf == "" {
+		p.leaf = ""
+		p.status.SetText("Цепочки нет. Соберите её: Добавить туннель -> Собрать цепочку из двух конфигов.")
+		p.button.SetEnabled(false)
+		return
+	}
+	p.leaf = info.Leaf
+
+	upCount := 0
+	moving := false
+	for _, hop := range info.Hops {
+		switch hop.State {
+		case manager.TunnelStarted:
+			upCount++
+		case manager.TunnelStarting, manager.TunnelStopping:
+			moving = true
+		}
+	}
+	total := len(info.Hops)
+	p.up = total > 0 && upCount == total
+
+	text := "Цепочка " + info.Leaf + ": "
+	switch {
+	case moving:
+		text += "перестраивается"
+	case p.up:
+		text += "поднята, звеньев " + strconv.Itoa(total)
+	case upCount == 0:
+		text += "опущена"
+	default:
+		text += "поднята наполовину, " + strconv.Itoa(upCount) + " из " + strconv.Itoa(total)
+	}
+	if info.LockOn {
+		text += ", замок закрыт"
+	} else if p.up {
+		text += ", замок снят"
+	}
+	if info.LockOn && !info.InProc {
+		text += " (отдельной охраной)"
+	}
+	p.status.SetText(text)
+
+	if p.up {
+		p.button.SetText("Опустить цепочку")
+	} else {
+		p.button.SetText("Поднять цепочку")
+	}
+	p.button.SetEnabled(!p.busy && !moving)
+}
+
+func (p *chainPanel) onClick() {
+	if p.busy || p.leaf == "" {
+		return
+	}
+	p.busy = true
+	p.button.SetEnabled(false)
+	leaf := p.leaf
+	drop := p.up
+	go func() {
+		tunnel := manager.Tunnel{Name: leaf}
+		var err error
+		if drop {
+			err = tunnel.Stop()
+		} else {
+			err = tunnel.Start()
+		}
+		p.sync(func() {
+			p.busy = false
+			if err != nil {
+				showErrorCustom(p.tp.Form(), "AwgChain", "Не получилось: "+err.Error())
+			}
+		})
+	}()
+}

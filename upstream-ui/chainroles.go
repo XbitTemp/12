@@ -5,8 +5,7 @@ import (
 	"github.com/amnezia-vpn/amneziawg-windows/v3/conf"
 )
 
-const chainMsgYes = 6
-const chainMsgNo = 7
+// Patch 54: the dialog answers come from walk, not from raw numbers.
 
 // Выбор ролей звеньев. Если оценка уверенная, спрашивать не нужно.
 // Иначе показываем окно и спрашиваем, какой конфиг внешний (WARP).
@@ -31,10 +30,10 @@ func chainPickRoles(owner walk.Form, configs []*conf.Config) (*conf.Config, *con
 
 	res := walk.MsgBox(owner, "Какой конфиг внешний?", text, walk.MsgBoxYesNoCancel|walk.MsgBoxIconQuestion)
 	switch res {
-	case chainMsgYes:
+	case walk.DlgCmdYes:
 		outer, inner = conf.ChainSortRolesForced(a, b, false)
 		return outer, inner, true
-	case chainMsgNo:
+	case walk.DlgCmdNo:
 		outer, inner = conf.ChainSortRolesForced(a, b, true)
 		return outer, inner, true
 	}

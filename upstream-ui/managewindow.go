@@ -24,6 +24,8 @@ type ManageTunnelsWindow struct {
 	tunnelsPage *TunnelsPage
 	logPage     *LogPage
 	updatePage  *UpdatePage
+	settingsPage *SettingsPage
+	updateTabIndex int
 
 	tunnelChangedCB *manager.TunnelChangeCallback
 }
@@ -108,6 +110,10 @@ func NewManageTunnelsWindow() (*ManageTunnelsWindow, error) {
 		return nil, err
 	}
 	mtw.tabs.Pages().Add(mtw.logPage.TabPage)
+	if settingsPage, settingsErr := NewSettingsPage(); settingsErr == nil {
+		mtw.settingsPage = settingsPage
+		mtw.tabs.Pages().Add(settingsPage.TabPage)
+	}
 
 	mtw.tunnelChangedCB = manager.IPCClientRegisterTunnelChange(mtw.onTunnelChange)
 	globalState, _ := manager.IPCClientGlobalState()
@@ -186,6 +192,7 @@ func (mtw *ManageTunnelsWindow) UpdateFound() {
 	if err == nil {
 		mtw.updatePage = updatePage
 		mtw.tabs.Pages().Add(updatePage.TabPage)
+		mtw.updateTabIndex = mtw.tabs.Pages().Len() - 1
 	}
 }
 
@@ -213,12 +220,12 @@ func (mtw *ManageTunnelsWindow) WndProc(hwnd win.HWND, msg uint32, wParam, lPara
 		}
 		if !mtw.Visible() {
 			mtw.tunnelsPage.listView.SelectFirstActiveTunnel()
-			if mtw.tabs.Pages().Len() != 3 {
+			if mtw.updatePage == nil {
 				mtw.tabs.SetCurrentIndex(0)
 			}
 		}
-		if mtw.tabs.Pages().Len() == 3 {
-			mtw.tabs.SetCurrentIndex(2)
+		if mtw.updatePage != nil && mtw.updateTabIndex > 0 {
+			mtw.tabs.SetCurrentIndex(mtw.updateTabIndex)
 		}
 		raise(mtw.Handle())
 		return 0

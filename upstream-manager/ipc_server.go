@@ -472,6 +472,31 @@ func (s *ManagerService) ServeConn(reader io.Reader, writer io.Writer) {
 			}
 		case UpdateMethodType:
 			s.Update()
+		case ChainSettingsGetMethodType:
+			if chainErr := s.chainServeSettingsGet(decoder, encoder); chainErr != nil {
+				return
+			}
+		case ChainSettingsSetMethodType:
+			if chainErr := s.chainServeSettingsSet(decoder, encoder); chainErr != nil {
+				return
+			}
+		case ChainGlobalGetMethodType:
+			if chainErr := s.chainServeGlobalGet(encoder); chainErr != nil {
+				return
+			}
+		case ChainGlobalSetMethodType:
+			if chainErr := s.chainServeGlobalSet(decoder, encoder); chainErr != nil {
+				return
+			}
+		case ChainLiftLockMethodType:
+			if chainErr := s.chainServeLiftLock(encoder); chainErr != nil {
+				return
+			}
+		case ChainStatusMethodType:
+			err = s.chainServeStatus(encoder)
+			if err != nil {
+				return
+			}
 		default:
 			return
 		}
@@ -483,6 +508,7 @@ func IPCServerListen(reader, writer, events *os.File, elevatedToken windows.Toke
 		events:        events,
 		elevatedToken: elevatedToken,
 	}
+	go service.chainAutoRaiseOnStart()
 
 	go func() {
 		managerServicesLock.Lock()

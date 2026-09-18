@@ -29,6 +29,9 @@ type EditDialog struct {
 	config                          conf.Config
 	lastPrivateKey                  string
 	blockUntunneledTraficCheckGuard bool
+	chainChecks                     walk.Container
+	chainIPv6CB                     *walk.CheckBox
+	chainLANCB                      *walk.CheckBox
 }
 
 func runEditDialog(owner walk.Form, tunnel *manager.Tunnel) *conf.Config {
@@ -126,13 +129,18 @@ func newEditDialog(owner walk.Form, tunnel *manager.Tunnel) (*EditDialog, error)
 	buttonsContainer.SetLayout(walk.NewHBoxLayout())
 	buttonsContainer.Layout().SetMargins(walk.Margins{})
 
-	if dlg.blockUntunneledTrafficCB, err = walk.NewCheckBox(buttonsContainer); err != nil {
+	if dlg.blockUntunneledTrafficCB, err = walk.NewCheckBox(chainChecksBox(dlg, buttonsContainer)); err != nil {
 		return nil, err
 	}
 	dlg.blockUntunneledTrafficCB.SetText(l18n.Sprintf("&Block untunneled traffic (kill-switch)"))
 	dlg.blockUntunneledTrafficCB.SetToolTipText(l18n.Sprintf("When a configuration has exactly one peer, and that peer has an allowed IPs containing at least one of 0.0.0.0/0 or ::/0, and the interface does not have table off, then the tunnel service engages a firewall ruleset to block all traffic that is neither to nor from the tunnel interface or is to the wrong DNS server, with special exceptions for DHCP and NDP."))
-	dlg.blockUntunneledTrafficCB.SetVisible(false)
+	dlg.blockUntunneledTrafficCB.SetVisible(true)
 	dlg.blockUntunneledTrafficCB.CheckedChanged().Attach(dlg.onBlockUntunneledTrafficCBCheckedChanged)
+	dlg.blockUntunneledTrafficCB.SetText(chainCheckLockLabel)
+	dlg.blockUntunneledTrafficCB.SetToolTipText(chainCheckLockHint)
+	if err = chainExtraChecks(dlg); err != nil {
+		return nil, err
+	}
 
 	walk.NewHSpacer(buttonsContainer)
 
@@ -186,7 +194,7 @@ func equalIPCidrs(a, b conf.IPCidr) bool {
 	return a.IP.Equal(b.IP) && (a.Cidr == b.Cidr)
 }
 
-func (dlg *EditDialog) onBlockUntunneledTrafficCBCheckedChanged() {
+func (dlg *EditDialog) chainLegacyBlockToggle() {
 	if dlg.blockUntunneledTraficCheckGuard {
 		return
 	}
@@ -285,11 +293,11 @@ err:
 	dlg.syntaxEdit.SetText(text)
 }
 
-func (dlg *EditDialog) onBlockUntunneledTrafficStateChanged(state int) {
+func (dlg *EditDialog) chainLegacyBlockStateChanged(state int) {
 	dlg.blockUntunneledTraficCheckGuard = true
 	switch syntax.BlockState(state) {
 	case syntax.InevaluableBlockingUntunneledTraffic:
-		dlg.blockUntunneledTrafficCB.SetVisible(false)
+		dlg.blockUntunneledTrafficCB.SetVisible(true)
 	case syntax.BlockingUntunneledTraffic:
 		dlg.blockUntunneledTrafficCB.SetVisible(true)
 		dlg.blockUntunneledTrafficCB.SetChecked(true)
@@ -354,6 +362,7 @@ func (dlg *EditDialog) onSaveButtonClicked() {
 		return
 	}
 
+	dlg.chainSaveChecks(newName)
 	dlg.config = *cfg
 	dlg.Accept()
 }

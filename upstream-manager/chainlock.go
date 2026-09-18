@@ -127,6 +127,12 @@ func chainLockLANs(root string) []net.IPNet {
 // answers true when the chain is protected and the caller must not start the
 // guard process, and false when the caller should fall back to the old way.
 func chainArmLockInProc(leaf string) bool {
+	if !ChainSettingsFor(leaf).KillSwitch {
+		log.Printf("[AwgChain] The kill switch is switched off in the settings of %s", leaf)
+		chainApplyIPv6For(leaf)
+		return true
+	}
+
 	if chainInProcLockDisabled() {
 		return false
 	}
@@ -188,7 +194,7 @@ func chainArmLockInProc(leaf string) bool {
 		Hop2Port:     topPort,
 		DNSServers:   chainLockDNS(top),
 		AllowedApps:  apps,
-		AllowedLANs:  chainLockLANs(root),
+		AllowedLANs:  chainSettingsLANs(root, leaf),
 	}
 
 	err = firewall.EnableChainFirewall(cfg)
@@ -211,6 +217,7 @@ func chainArmLockInProc(leaf string) bool {
 	chainLockMu.Unlock()
 
 	log.Printf("[AwgChain] Kill switch armed inside the manager for %s -> %s, no separate guard process", root, top)
+	chainApplyIPv6For(leaf)
 	go chainLockWatchStopEvent(stop)
 	return true
 }
@@ -232,6 +239,7 @@ func chainDisarmLockInProc() bool {
 	}
 	firewall.DisableChainFirewall()
 	log.Printf("[AwgChain] Kill switch lifted, the machine is open again")
+	chainDropIPv6Block()
 	return true
 }
 
